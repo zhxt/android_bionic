@@ -614,6 +614,7 @@ static void dump(soinfo *si)
 #endif
 
 static const char * const sopaths[] = {
+	"/usr/libexec/droid-hybris/system/lib",
     "/vendor/lib",
     "/system/lib",
     0
