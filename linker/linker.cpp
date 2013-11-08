@@ -628,6 +628,29 @@ static int _open_lib(const char* name) {
     return TEMP_FAILURE_RETRY(open(name, O_RDONLY));
 }
 
+static void parse_library_path(const char *path, char *delim)
+{
+    size_t len;
+    char *ldpaths_bufp = ldpaths_buf;
+    int i = 0;
+
+    len = strlcpy(ldpaths_buf, path, sizeof(ldpaths_buf));
+
+    while (i < LDPATH_MAX && (ldpaths[i] = strsep(&ldpaths_bufp, delim))) {
+        if (*ldpaths[i] != '\0')
+            ++i;
+    }
+
+    /* Forget the last path if we had to truncate; this occurs if the 2nd to
+     * last char isn't '\0' (i.e. not originally a delim). */
+    if (i > 0 && len >= sizeof(ldpaths_buf) &&
+            ldpaths_buf[sizeof(ldpaths_buf) - 2] != '\0') {
+        ldpaths[i - 1] = NULL;
+    } else {
+        ldpaths[i] = NULL;
+    }
+}
+
 static int open_library(const char *name)
 {
     int fd;
@@ -642,6 +665,12 @@ static int open_library(const char *name)
 
     if ((name[0] == '/') && ((fd = _open_lib(name)) >= 0))
         return fd;
+
+	// This allows us to run android apps in a Mer rootfs
+	if (getenv("HYBRIS_LD_LIBRARY_PATH") != NULL && *ldpaths == 0)
+    {
+        parse_library_path(getenv("HYBRIS_LD_LIBRARY_PATH"), ":");
+    }
 
     for (path = ldpaths; *path; path++) {
         n = format_buffer(buf, sizeof(buf), "%s/%s", *path, name);
