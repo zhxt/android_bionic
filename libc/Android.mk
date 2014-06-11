@@ -1,3 +1,4 @@
+
 LOCAL_PATH:= $(call my-dir)
 
 include $(LOCAL_PATH)/arch-$(TARGET_ARCH)/syscalls.mk
@@ -230,7 +231,7 @@ libc_bionic_src_files := \
     bionic/sbrk.cpp \
     bionic/scandir.cpp \
     bionic/sched_getaffinity.cpp \
-    bionic/__set_errno.cpp \
+    bionic/__set_errno.c \
     bionic/setlocale.cpp \
     bionic/signalfd.cpp \
     bionic/sigwait.cpp \
@@ -701,6 +702,34 @@ LOCAL_SYSTEM_SHARED_LIBRARIES :=
 
 include $(BUILD_STATIC_LIBRARY)
 
+# ========================================================
+# libdsyscalls.so
+# ========================================================
+
+include $(CLEAR_VARS)
+
+LOCAL_SRC_FILES := \
+	$(libc_arch_static_src_files) \
+	$(libc_static_common_src_files) \
+	bionic/dlmalloc.c \
+	bionic/malloc_debug_common.cpp \
+	bionic/__set_errno.c \
+	hybris/libdsyscalls.c
+
+LOCAL_C_INCLUDES := $(libc_common_c_includes)
+LOCAL_CFLAGS := $(libc_common_cflags)
+
+LOCAL_MODULE:= libdsyscalls
+
+LOCAL_SHARED_LIBRARIES := libdl
+LOCAL_WHOLE_STATIC_LIBRARIES := libc_common
+LOCAL_SYSTEM_SHARED_LIBRARIES :=
+
+LOCAL_LDFLAGS := -Wl,--exclude-libs=libgcc.a
+
+LOCAL_MODULE_TAGS := optional
+
+include $(BUILD_SHARED_LIBRARY)
 
 # ========================================================
 # libc_tzcode.a - upstream 'tzcode' code
@@ -851,6 +880,7 @@ include $(CLEAR_VARS)
 LOCAL_SRC_FILES := \
 	$(libc_arch_static_src_files) \
 	$(libc_static_common_src_files) \
+	bionic/__set_errno.c \
 	bionic/dlmalloc.c \
 	bionic/malloc_debug_common.cpp \
 	bionic/libc_init_static.cpp
@@ -881,9 +911,11 @@ include $(CLEAR_VARS)
 LOCAL_CFLAGS := $(libc_common_cflags) -std=gnu99 -DPTHREAD_DEBUG -DPTHREAD_DEBUG_ENABLED=0
 LOCAL_C_INCLUDES := $(libc_common_c_includes)
 
+LOCAL_LDFLAGS := -Wl,--no-fatal-warnings
 LOCAL_SRC_FILES := \
 	$(libc_arch_dynamic_src_files) \
 	$(libc_static_common_src_files) \
+	bionic/__set_errno.c \
 	bionic/dlmalloc.c \
 	bionic/malloc_debug_common.cpp \
 	bionic/pthread_debug.cpp \
@@ -912,7 +944,7 @@ LOCAL_REQUIRED_MODULES := tzdata
 # create an "cloaked" dependency on libgcc.a in libc though the libraries, which is not what
 # you wanted!
 
-LOCAL_SHARED_LIBRARIES := libdl
+LOCAL_SHARED_LIBRARIES := libdl libdsyscalls
 LOCAL_WHOLE_STATIC_LIBRARIES := libc_common
 LOCAL_SYSTEM_SHARED_LIBRARIES :=
 
