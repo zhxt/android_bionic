@@ -90,6 +90,7 @@ static soinfo* sonext = &libdl_info;
 static soinfo* somain; /* main process, always the one after libdl_info */
 
 static const char* const gSoPaths[] = {
+  "/usr/libexec/droid-hybris/system/lib",
   "/vendor/lib",
   "/system/lib",
   NULL
