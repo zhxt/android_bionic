@@ -432,9 +432,6 @@ static const prop_info *find_property(prop_bt *trie, const char *name,
 
 const prop_info *__system_property_find(const char *name)
 {
-    // 2015-02-26: it's a horrid hack, but makes all sensors work
-    // proper investigation is mandatory!
-    return NULL;
     if (__predict_false(compat_mode)) {
         return __system_property_find_compat(name);
     }
