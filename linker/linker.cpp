@@ -980,16 +980,16 @@ static bool walk_dependencies_tree(soinfo* root_soinfos[], size_t root_soinfos_s
 
     visited.push_back(si);
 
-    si->get_children().for_each([&](soinfo* child) {
-      visit_list.push_back(child);
-    });
-
     if (do_shims) {
       shim_libs_for_each(si->get_realpath(), [&](soinfo* child) {
         si->add_child(child);
         visit_list.push_back(child);
       });
     }
+
+    si->get_children().for_each([&](soinfo* child) {
+      visit_list.push_back(child);
+    });
   }
 
   return true;
@@ -2208,14 +2208,14 @@ bool soinfo::relocate(const VersionTracker& version_tracker, ElfRelIteratorT&& r
         MARK(rel->r_offset);
         TRACE_TYPE(RELO, "RELO R_X86_64_32 %08zx <- +%08zx %s", static_cast<size_t>(reloc),
                    static_cast<size_t>(sym_addr), sym_name);
-        *reinterpret_cast<ElfW(Addr)*>(reloc) = sym_addr + addend;
+        *reinterpret_cast<Elf32_Addr*>(reloc) = sym_addr + addend;
         break;
       case R_X86_64_64:
         count_relocation(kRelocRelative);
         MARK(rel->r_offset);
         TRACE_TYPE(RELO, "RELO R_X86_64_64 %08zx <- +%08zx %s", static_cast<size_t>(reloc),
                    static_cast<size_t>(sym_addr), sym_name);
-        *reinterpret_cast<ElfW(Addr)*>(reloc) = sym_addr + addend;
+        *reinterpret_cast<Elf64_Addr*>(reloc) = sym_addr + addend;
         break;
       case R_X86_64_PC32:
         count_relocation(kRelocRelative);
@@ -2223,7 +2223,7 @@ bool soinfo::relocate(const VersionTracker& version_tracker, ElfRelIteratorT&& r
         TRACE_TYPE(RELO, "RELO R_X86_64_PC32 %08zx <- +%08zx (%08zx - %08zx) %s",
                    static_cast<size_t>(reloc), static_cast<size_t>(sym_addr - reloc),
                    static_cast<size_t>(sym_addr), static_cast<size_t>(reloc), sym_name);
-        *reinterpret_cast<ElfW(Addr)*>(reloc) = sym_addr + addend - reloc;
+        *reinterpret_cast<Elf32_Addr*>(reloc) = sym_addr + addend - reloc;
         break;
 #elif defined(__arm__)
       case R_ARM_ABS32:
@@ -3013,15 +3013,21 @@ bool soinfo::link_image(const soinfo_list_t& global_group, const soinfo_list_t& 
   if (has_text_relocations) {
     // Fail if app is targeting sdk version > 22
     // TODO (dimitry): remove != __ANDROID_API__ check once http://b/20020312 is fixed
+#if !defined(__i386__) // ffmpeg says that they require text relocations on x86
     if (get_application_target_sdk_version() != __ANDROID_API__
         && get_application_target_sdk_version() > 22) {
       PRINT("%s: has text relocations", get_realpath());
       DL_ERR("%s: has text relocations", get_realpath());
       return false;
     }
+#endif
     // Make segments writable to allow text relocations to work properly. We will later call
     // phdr_table_protect_segments() after all of them are applied and all constructors are run.
+#if defined(USE_LEGACY_BLOBS)
+    DEBUG("%s has text relocations. This is wasting memory and prevents "
+#else
     DL_WARN("%s has text relocations. This is wasting memory and prevents "
+#endif
             "security hardening. Please fix.", get_realpath());
     if (phdr_table_unprotect_segments(phdr, phnum, load_bias) < 0) {
       DL_ERR("can't unprotect loadable segments for \"%s\": %s",

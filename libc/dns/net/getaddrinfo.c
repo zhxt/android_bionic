@@ -108,6 +108,8 @@
 #include <stdarg.h>
 #include "nsswitch.h"
 
+#include "hosts_cache.h"
+
 #ifdef ANDROID_CHANGES
 #include <sys/system_properties.h>
 #endif /* ANDROID_CHANGES */
@@ -1791,10 +1793,14 @@ _find_src_addr(const struct sockaddr *addr, struct sockaddr *src_addr, unsigned 
 			return -1;
 		}
 	}
-	if (mark != MARK_UNSET && setsockopt(sock, SOL_SOCKET, SO_MARK, &mark, sizeof(mark)) < 0)
+	if (mark != MARK_UNSET && setsockopt(sock, SOL_SOCKET, SO_MARK, &mark, sizeof(mark)) < 0) {
+		close(sock);
 		return 0;
-	if (uid > 0 && uid != NET_CONTEXT_INVALID_UID && fchown(sock, uid, (gid_t)-1) < 0)
+	}
+	if (uid > 0 && uid != NET_CONTEXT_INVALID_UID && fchown(sock, uid, (gid_t)-1) < 0) {
+		close(sock);
 		return 0;
+	}
 	do {
 		ret = __connect(sock, addr, len);
 	} while (ret == -1 && errno == EINTR);
@@ -2102,6 +2108,14 @@ _files_getaddrinfo(void *rv, void *cb_data, va_list ap)
 
 	name = va_arg(ap, char *);
 	pai = va_arg(ap, struct addrinfo *);
+
+	memset(&sentinel, 0, sizeof(sentinel));
+	cur = &sentinel;
+	int gai_error = hc_getaddrinfo(name, NULL, pai, &cur);
+	if (gai_error != EAI_SYSTEM) {
+		*((struct addrinfo **)rv) = sentinel.ai_next;
+		return (gai_error == 0 ? NS_SUCCESS : NS_NOTFOUND);
+	}
 
 //	fprintf(stderr, "_files_getaddrinfo() name = '%s'\n", name);
 	memset(&sentinel, 0, sizeof(sentinel));
